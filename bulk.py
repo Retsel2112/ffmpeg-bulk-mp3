@@ -1,5 +1,6 @@
 #ffmpeg.exe -i "\\10.0.0.10\Data\Folder\ytdl\Somali Yacht Club - The Sun (2014) (Full Album)-DGPyHQ2FSUQ.mp4" -codec:a libmp3lame -qscale:a 2 \\10.0.0.10\Data\Folder\ytdl\conversions\test2.mp3
 from multiprocessing import Pool
+import argparse
 import os
 import os.path
 
@@ -16,7 +17,10 @@ def get_media_paths(folder):
       if os.path.splitext(f)[1] in ('.mp4', '.webm')]
 
 if __name__ == '__main__':
-    folder = os.path.abspath('..')
+    parser = argparse.ArgumentParser(description='Convert media to media')
+    parser.add_argument('-d', '--directory', required=True, help='Source directory containing mp4 or webm files')
+    args = parser.parse_args()
+    folder = os.path.abspath(args.directory)
     media = get_media_paths(folder)
     pool = Pool()
     pool.map(convert, media)

@@ -5,11 +5,12 @@ import os.path
 import struct
 import subprocess
 import string
+import time
 
 import musicbrainzngs as mb
 
 mb.set_useragent("Zed Track Splitter", "0.1", "http://gitgud.malvager.net/zed")
-okchars = string.ascii_letters + string.whitespace
+okchars = string.ascii_letters + string.digits + string.whitespace
 
 def mangle_title(bulky):
     nameparts = bulky.split('(')
@@ -42,8 +43,12 @@ def get_media_paths(folder):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert media to media')
     parser.add_argument('-d', '--directory', required=True, help='Source directory containing mp4 or webm files')
+    parser.add_argument('-a', '--actuallyrun', action='store_true')
     args = parser.parse_args()
     folder = os.path.abspath(args.directory)
     media = get_media_paths(folder)
     for m in media:
         print(mangle_title(m))
+        if args.actuallyrun:
+            print(get_track_list(m))
+            time.sleep(15)

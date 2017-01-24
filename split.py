@@ -120,10 +120,9 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--destination', required=True, help='Destination directory to place converted files')
     parser.add_argument('-f', '--finished', required=True, help='Directory to move source files after conversion')
     args = parser.parse_args()
-    wdir = os.path.dirname(os.path.abspath(sys.argv[0]))
-    args.finished = os.path.join(wdir, args.finished)
-    args.destination = os.path.join(wdir, args.destination)
-    args.source = os.path.join(wdir, args.source)
+    args.finished = os.path.abspath(args.finished)
+    args.destination = os.path.abspath(args.destination)
+    args.source = os.path.abspath(args.source)
     try:
         os.makedirs(args.destination)
     except OSError as ex:

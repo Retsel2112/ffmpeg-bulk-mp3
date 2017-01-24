@@ -77,7 +77,7 @@ def splittrack(packarg):
                         tout.setframerate(samprate)
                         tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:ender], chanb[0:ender]))))
                         tout.close()
-                        tracks.append((artist, album, trackname, '%d/%d' % (j, len(tracklist)), trackfilename, args.destination))
+                        tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
                         j += 1
                         chana = chana[ender:]
                         chanb = chanb[ender:]
@@ -98,14 +98,13 @@ def splittrack(packarg):
         tout.setframerate(samprate)
         tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:ender], chanb[0:ender]))))
         tout.close()
-        tracks.append((artist, album, trackname, '%d/%d' % (j, len(tracklist)), trackfilename, args.destination))
+        tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
     f.close()
     os.remove(tmp_file_name)
     print(tracks)
     list(map(convert, tracks))
-    print("And that' it")
-    #move source file to args.finished
-    shutil.move(filename, os.path.join(args.finished, filename))
+    print("And that's it")
+    shutil.move(filename, os.path.join(args.finished, os.path.basename(filename)))
     return
 
 

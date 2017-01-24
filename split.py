@@ -138,7 +138,7 @@ if __name__ == '__main__':
     print(media)
     mb.set_useragent("Zed Track Splitter", "0.1", "http://gitgud.malvager.net/zed")
 
-    splitpool = multiprocessing.Pool(processes=1)
+    splitpool = multiprocessing.Pool()
     splitpool.map(splittrack, ((args, m) for m in media))
     splitpool.close() 
     splitpool.join()

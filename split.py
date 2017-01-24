@@ -15,7 +15,7 @@ import musicbrainzngs as mb
 
 import idgetter
 
-
+MULTIPROC = 4
 READBUF = 44100 * 60
 
 def convert(fileinfo):
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     print(media)
     mb.set_useragent("Zed Track Splitter", "0.1", "http://gitgud.malvager.net/zed")
 
-    splitpool = multiprocessing.Pool()
+    splitpool = multiprocessing.Pool(min(os.cpu_count(), MULTIPROC))
     splitpool.map(splittrack, ((args, m) for m in media))
     splitpool.close() 
     splitpool.join()

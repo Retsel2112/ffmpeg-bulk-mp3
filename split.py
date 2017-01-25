@@ -15,16 +15,41 @@ import musicbrainzngs as mb
 
 import idgetter
 
-MULTIPROC = 4
+MULTIPROC = 1
 READBUF = 44100 * 60
+SILENCE_LEVEL = 200
+SILENCE_DURATION = 44000
 
 def convert(fileinfo):
     artist, album, trackname, trackorder, trackfilename, trackdestination = fileinfo
     print(fileinfo)
     newname = '.'.join([os.path.splitext(os.path.split(trackfilename)[1])[0], "mp3"])
     newpath = os.sep.join((trackdestination, newname))
-    print('ffmpeg -i "{0}" -codec:a libmp3lame -qscale:a 2 -metadata album="{2}" -metadata artist="{3}" -metadata title="{4}" -metadata track="{5}" "{1}" '.format(trackfilename, newpath, album, artist, trackname, trackorder))
-    os.system('ffmpeg -i "{0}" -codec:a libmp3lame -qscale:a 2 -metadata album="{2}" -metadata artist="{3}" -metadata title="{4}" -metadata track="{5}" "{1}" '.format(trackfilename, newpath, album, artist, trackname, trackorder))
+    #print('ffmpeg -loglevel error -i "{0}" -codec:a libmp3lame -qscale:a 2 -metadata album="{2}" -metadata artist="{3}" -metadata title="{4}" -metadata track="{5}" "{1}" '.format(trackfilename, newpath, album, artist, trackname, trackorder))
+    #os.system('ffmpeg -loglevel error -i "{0}" -codec:a libmp3lame -qscale:a 2 -metadata album="{2}" -metadata artist="{3}" -metadata title="{4}" -metadata track="{5}" "{1}" '.format(trackfilename, newpath, album, artist, trackname, trackorder))
+    print(' '.join([
+    'ffmpeg', 
+    '-loglevel', 'error', 
+    '-i', trackfilename, 
+    '-codec:a', 'libmp3lame', 
+    '-qscale:a', '2', 
+    '-metadata', 'album="{}"'.format(album), 
+    '-metadata', 'artist="{}"'.format(artist),
+    '-metadata', 'title="{}"'.format(trackname),
+    '-metadata', 'track="{}"'.format(trackorder),
+    newpath]))
+    proc = subprocess.Popen([
+    'ffmpeg', 
+    '-loglevel', 'error', 
+    '-i', trackfilename, 
+    '-codec:a', 'libmp3lame', 
+    '-qscale:a', '2', 
+    '-metadata', 'album="{}"'.format(album), 
+    '-metadata', 'artist="{}"'.format(artist),
+    '-metadata', 'title="{}"'.format(trackname),
+    '-metadata', 'track="{}"'.format(trackorder),
+    newpath])
+    (outdata,err) = proc.communicate()
     os.remove(trackfilename)
 
 def splittrack(packarg):
@@ -37,7 +62,7 @@ def splittrack(packarg):
     if tracklist is None:
         return
     #os.system(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
-    proc = subprocess.Popen(['ffmpeg', '-i', filename, '-y', '-codec:a', 'pcm_s16le', tmp_file_name], shell=False)
+    proc = subprocess.Popen(['ffmpeg', '-loglevel', 'error', '-i', filename, '-y', '-codec:a', 'pcm_s16le', tmp_file_name], shell=False)
     (outwavdata, err) = proc.communicate()
     f = wave.open(tmp_file_name, 'rb')
     chans = f.getnchannels()
@@ -58,10 +83,10 @@ def splittrack(packarg):
             l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
             chana.append(l)
             chanb.append(r)
-            if abs(l) < 200:
+            if abs(l) < SILENCE_LEVEL:
                 zerorow += 1
             else:
-                if zerorow > 10000:
+                if zerorow > SILENCE_DURATION:
                     print("%d in a row" % (zerorow))
                     ender = -int(zerorow / 2)
                     if sliceStart:

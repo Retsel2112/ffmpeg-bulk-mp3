@@ -76,7 +76,7 @@ def get_track_list(yttitle):
             if int(albcorrectness) > 97:
                 album_id = release_res['release-list'][0]['id']
                 rel = mb.get_release_by_id(album_id, includes=['recordings'])
-                return artist, album, [c['recording']['title'] for c in rel['release']['medium-list'][0]['track-list']]
+                return artist, album, [(c['recording']['title'], int(c['recording']['length'])) for c in rel['release']['medium-list'][0]['track-list']]
     except IndexError:
         # No hits.
         pass

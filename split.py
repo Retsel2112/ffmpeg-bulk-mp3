@@ -15,10 +15,19 @@ import musicbrainzngs as mb
 
 import idgetter
 
-MULTIPROC = 1
 READBUF = 44100 * 60
-SILENCE_LEVEL = 200
-SILENCE_DURATION = 44000
+SILENCE_LEVEL = 1000
+SILENCE_DURATION = 10000
+SPLIT_EPSILON = 3 # seconds of leeway around musicbrainz track length and track silence location
+
+def reached(a, b, rate = 44100):
+    if a > b:
+        print("checked %d vs %d" % (a/rate, b/rate))
+        return True
+    return False
+    if abs(a - b) < SPLIT_EPSILON * rate:
+        return True
+    return False
 
 def convert(fileinfo):
     artist, album, trackname, trackorder, trackfilename, trackdestination = fileinfo
@@ -33,10 +42,10 @@ def convert(fileinfo):
     '-i', trackfilename, 
     '-codec:a', 'libmp3lame', 
     '-qscale:a', '2', 
-    '-metadata', 'album="{}"'.format(album), 
-    '-metadata', 'artist="{}"'.format(artist),
-    '-metadata', 'title="{}"'.format(trackname),
-    '-metadata', 'track="{}"'.format(trackorder),
+    '-metadata', 'album={}'.format(album), 
+    '-metadata', 'artist={}'.format(artist),
+    '-metadata', 'title={}'.format(trackname),
+    '-metadata', 'track={}'.format(trackorder),
     newpath]))
     proc = subprocess.Popen([
     'ffmpeg', 
@@ -58,6 +67,7 @@ def splittrack(packarg):
     with tempfile.NamedTemporaryFile(dir='tmp', suffix='.wav', delete=False) as tmpfile:
         tmp_file_name = tmpfile.name
     artist, album, tracklist = idgetter.get_track_list(newname)
+    print(tracklist)
     print(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
     if tracklist is None:
         return
@@ -74,46 +84,51 @@ def splittrack(packarg):
     chanb = []
     tracks = []
     zerorow = 0
-    sliceStart = False
     j = 0
-    #for i in range(samps):
+    samples_processed = 0
+    # the track length returned by musicbrainz is in mulliseconds.
+    # convert that to seconds then multiply by our sample rate to get an idea
+    # of when the next track should end, sample-wise
+    split_estimate = int((tracklist[j][1] / 1000) * samprate)
     while True:
         twoch_samps = f.readframes(READBUF)
         for twoch_samp in range(0,len(twoch_samps),sampwidth*chans):
+            samples_processed += 1
             l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
             chana.append(l)
             chanb.append(r)
             if abs(l) < SILENCE_LEVEL:
                 zerorow += 1
-            else:
-                if zerorow > SILENCE_DURATION:
-                    print("%d in a row" % (zerorow))
-                    ender = -int(zerorow / 2)
-                    if sliceStart:
-                        try:
-                            trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j], album)
-                            trackname = tracklist[j]
-                        except IndexError:
-                            trackfilename = 'file_%d.wav' % (j)
-                            trackname = 'Track %d' % (j)
-                        tout = wave.open(trackfilename, 'wb')
-                        tout.setnchannels(2)
-                        tout.setsampwidth(sampwidth)
-                        tout.setframerate(samprate)
-                        tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:ender], chanb[0:ender]))))
-                        tout.close()
-                        tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
-                        j += 1
-                        chana = chana[ender:]
-                        chanb = chanb[ender:]
-                    sliceStart = True
+            if zerorow > SILENCE_DURATION and reached(samples_processed, split_estimate, samprate):
+                print("%d in a row" % (zerorow))
+                ender = max(-int(zerorow / 2), -10000)
+                try:
+                    trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j][0], album)
+                    trackname = tracklist[j][0]
+                except IndexError:
+                    trackfilename = 'file_%d.wav' % (j)
+                    trackname = 'Track %d' % (j)
+                tout = wave.open(trackfilename, 'wb')
+                tout.setnchannels(2)
+                tout.setsampwidth(sampwidth)
+                tout.setframerate(samprate)
+                tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:ender], chanb[0:ender]))))
+                tout.close()
+                tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
+                j += 1
+                if j != len(tracklist):
+                    split_estimate += int((tracklist[j][1] / 1000) * samprate)
+                else:
+                    split_estimate = samps * 2
+                chana = chana[ender:]
+                chanb = chanb[ender:]
                 zerorow = 0
         if len(twoch_samps) < (READBUF * sampwidth * chans):
             break
     if len(chana) > 10000:
         try:
-            trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j], album)
-            trackname = tracklist[j]
+            trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j][0], album)
+            trackname = tracklist[j][0]
         except IndexError:
             trackfilename = 'file_%d.wav' % (j)
             trackname = 'Track %d' % (j)
@@ -144,6 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--source', required=True, help='Source directory containing mp4 or webm files')
     parser.add_argument('-d', '--destination', required=True, help='Destination directory to place converted files')
     parser.add_argument('-f', '--finished', required=True, help='Directory to move source files after conversion')
+    parser.add_argument('-m', '--multiproc', required=False, help='Maximum number of concurrent conversion processes (up to cpu_count) (default: 4)', type=int, default=4)
     args = parser.parse_args()
     args.finished = os.path.abspath(args.finished)
     args.destination = os.path.abspath(args.destination)
@@ -163,7 +179,7 @@ if __name__ == '__main__':
     print(media)
     mb.set_useragent("Zed Track Splitter", "0.1", "http://gitgud.malvager.net/zed")
 
-    splitpool = multiprocessing.Pool(min(os.cpu_count(), MULTIPROC))
+    splitpool = multiprocessing.Pool(min(os.cpu_count(), args.multiproc))
     splitpool.map(splittrack, ((args, m) for m in media))
     splitpool.close() 
     splitpool.join()

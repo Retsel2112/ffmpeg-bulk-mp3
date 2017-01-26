@@ -53,10 +53,10 @@ def convert(fileinfo):
     '-i', trackfilename, 
     '-codec:a', 'libmp3lame', 
     '-qscale:a', '2', 
-    '-metadata', 'album="{}"'.format(album), 
-    '-metadata', 'artist="{}"'.format(artist),
-    '-metadata', 'title="{}"'.format(trackname),
-    '-metadata', 'track="{}"'.format(trackorder),
+    '-metadata', 'album={}'.format(album), 
+    '-metadata', 'artist={}'.format(artist),
+    '-metadata', 'title={}'.format(trackname),
+    '-metadata', 'track={}'.format(trackorder),
     newpath])
     (outdata,err) = proc.communicate()
     os.remove(trackfilename)
@@ -67,7 +67,6 @@ def splittrack(packarg):
     with tempfile.NamedTemporaryFile(dir='tmp', suffix='.wav', delete=False) as tmpfile:
         tmp_file_name = tmpfile.name
     artist, album, tracklist = idgetter.get_track_list(newname)
-    print(tracklist)
     print(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
     if tracklist is None:
         return
@@ -106,7 +105,7 @@ def splittrack(packarg):
                     trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j][0], album)
                     trackname = tracklist[j][0]
                 except IndexError:
-                    trackfilename = 'file_%d.wav' % (j)
+                    trackfilename = '%s_%s_%d.wav' % (artist, album, j)
                     trackname = 'Track %d' % (j)
                 tout = wave.open(trackfilename, 'wb')
                 tout.setnchannels(2)
@@ -130,7 +129,7 @@ def splittrack(packarg):
             trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j][0], album)
             trackname = tracklist[j][0]
         except IndexError:
-            trackfilename = 'file_%d.wav' % (j)
+            trackfilename = '%s_%s_%d.wav' % (artist, album, j)
             trackname = 'Track %d' % (j)
         tout = wave.open(trackfilename, 'wb')
         tout.setnchannels(2)

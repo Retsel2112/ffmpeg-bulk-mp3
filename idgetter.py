@@ -67,15 +67,23 @@ def get_track_list(yttitle):
     artist, album = mangle_title(yttitle)
     search_string = mangle_title(yttitle)
     artist_res = mb.search_artists(artist=artist, type='group', strict=True)
+    release_res = mb.search_releases(release=album)
+    artists = []
+    arids = []
+    albums = []
     try:
-        correctness = artist_res['artist-list'][0]['ext:score']
-        if int(correctness) > 97:
-            artist_id = artist_res['artist-list'][0]['id']
-            release_res = mb.search_releases(arid=artist_id, release=album)
-            albcorrectness = release_res['release-list'][0]['ext:score']
-            if int(albcorrectness) > 97:
-                album_id = release_res['release-list'][0]['id']
-                rel = mb.get_release_by_id(album_id, includes=['recordings'])
+        for a in artist_res['artist-list']:
+            correctness = a['ext:score']
+            if int(correctness) < 97:
+                break
+            artists.append(a)
+            arids.append(a['id'])
+        for r in release_res['release-list']:
+            correctness = r['ext:score']
+            if int(correctness) < 97:
+                break
+            if r['artist-credit'][0]['artist']['id'] in arids:
+                rel = mb.get_release_by_id(r['id'], includes=['recordings'])
                 return artist, album, [(c['recording']['title'], int(c['recording']['length'])) for c in rel['release']['medium-list'][0]['track-list']]
     except IndexError:
         # No hits.

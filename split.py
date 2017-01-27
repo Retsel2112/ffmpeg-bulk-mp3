@@ -14,10 +14,14 @@ import wave
 import musicbrainzngs as mb
 
 import idgetter
+import fsm
 
 READBUF = 44100 * 60
-SILENCE_LEVEL = 1000
+SILENCE_LEVEL = 300
+LOUD_LEVEL = 2200
 SILENCE_DURATION = 10000
+BLIND_SILENCE_DURATION = 30000
+LOUD_DURATION = 22000
 SPLIT_EPSILON = 3 # seconds of leeway around musicbrainz track length and track silence location
 
 def reached(a, b, rate = 44100):
@@ -78,17 +82,22 @@ def splittrack(packarg):
     samps = f.getnframes()
     sampwidth = f.getsampwidth()
     samprate = f.getframerate()
+    SILENCE_WINDOW = int(samprate / 10)
     assert sampwidth == 2
     chana = []
     chanb = []
     tracks = []
     zerorow = 0
+    statetracker = fsm.fsm()
     j = 0
     samples_processed = 0
+    split_now = False
+    split_here = 0
     # the track length returned by musicbrainz is in mulliseconds.
     # convert that to seconds then multiply by our sample rate to get an idea
     # of when the next track should end, sample-wise
     split_estimate = int((tracklist[j][1] / 1000) * samprate)
+    silence_interval_check = int(samprate / 1000)
     while True:
         twoch_samps = f.readframes(READBUF)
         for twoch_samp in range(0,len(twoch_samps),sampwidth*chans):
@@ -96,13 +105,29 @@ def splittrack(packarg):
             l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
             chana.append(l)
             chanb.append(r)
-            if abs(l) < SILENCE_LEVEL:
-                zerorow += 1
-            if zerorow > SILENCE_DURATION and reached(samples_processed, split_estimate, samprate):
-                print("%d in a row" % (zerorow))
-                ender = max(-int(zerorow / 2), -10000)
+            #if abs(l) < SILENCE_LEVEL:
+            if 0 == samples_processed % SILENCE_WINDOW:
+                print('%d\t%d\t%d' % (int(samples_processed/samprate), sum((abs(s) for s in chana[-silence_interval_check:]))/min(silence_interval_check, len(chana)), zerorow))
+                avgval = sum((abs(s) for s in chana[-silence_interval_check:]))/min(silence_interval_check, len(chana))
+                statetracker.add_sample(avgval)
+                if avgval < SILENCE_LEVEL:
+                    zerorow += SILENCE_WINDOW
+            if abs(l) > SILENCE_LEVEL:
+                if split_estimate > 0:
+                    if zerorow > SILENCE_DURATION and reached(samples_processed, split_estimate, samprate):
+                        split_now = True
+                        split_here = max(-int(zerorow / 2), -10000)
+                else:
+                    if statetracker.should_split():
+                        split_now = True
+                        split_here = (-int(SILENCE_WINDOW * statetracker.last_quiet()))
+                        statetracker.reset()
+                if not split_now:
+                    zerorow = 0
+            if split_now:
+                print("%d in a row (%d)" % (zerorow, zerorow/samprate))
                 try:
-                    trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j][0], album)
+                    trackfilename = '%s - %s - %s.wav' % (artist, album, tracklist[j][0])
                     trackname = tracklist[j][0]
                 except IndexError:
                     trackfilename = '%s_%s_%d.wav' % (artist, album, j)
@@ -111,7 +136,7 @@ def splittrack(packarg):
                 tout.setnchannels(2)
                 tout.setsampwidth(sampwidth)
                 tout.setframerate(samprate)
-                tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:ender], chanb[0:ender]))))
+                tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:split_here], chanb[0:split_here]))))
                 tout.close()
                 tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
                 j += 1
@@ -119,14 +144,15 @@ def splittrack(packarg):
                     split_estimate += int((tracklist[j][1] / 1000) * samprate)
                 else:
                     split_estimate = samps * 2
-                chana = chana[ender:]
-                chanb = chanb[ender:]
+                chana = chana[split_here:]
+                chanb = chanb[split_here:]
                 zerorow = 0
+                split_now = False
         if len(twoch_samps) < (READBUF * sampwidth * chans):
             break
     if len(chana) > 10000:
         try:
-            trackfilename = '%s -  %s (%s).wav' % (artist, tracklist[j][0], album)
+            trackfilename = '%s - %s - %s.wav' % (artist, album, tracklist[j][0])
             trackname = tracklist[j][0]
         except IndexError:
             trackfilename = '%s_%s_%d.wav' % (artist, album, j)
@@ -135,7 +161,7 @@ def splittrack(packarg):
         tout.setnchannels(2)
         tout.setsampwidth(sampwidth)
         tout.setframerate(samprate)
-        tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:ender], chanb[0:ender]))))
+        tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana, chanb))))
         tout.close()
         tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
     f.close()

@@ -84,7 +84,7 @@ def get_track_list(yttitle):
                 break
             if r['artist-credit'][0]['artist']['id'] in arids:
                 rel = mb.get_release_by_id(r['id'], includes=['recordings'])
-                return artist, album, [(c['recording']['title'], int(c['recording']['length'])) for c in rel['release']['medium-list'][0]['track-list']]
+                return r['artist-credit'][0]['artist']['name'], r['title'], [(c['recording']['title'], int(c['recording'].get('length', 0))) for c in rel['release']['medium-list'][0]['track-list']]
     except IndexError:
         # No hits.
         pass

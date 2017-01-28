@@ -70,22 +70,32 @@ def get_track_list(yttitle):
     release_res = mb.search_releases(release=album)
     artists = []
     arids = []
-    albums = []
+    albums = dict()
     try:
+        alb_i = 0
         for a in artist_res['artist-list']:
             correctness = a['ext:score']
             if int(correctness) < 97:
                 break
             artists.append(a)
             arids.append(a['id'])
-        for r in release_res['release-list']:
+        for i, r in enumerate(release_res['release-list']):
             correctness = r['ext:score']
             if int(correctness) < 97:
                 break
             if r['artist-credit'][0]['artist']['id'] in arids:
                 rel = mb.get_release_by_id(r['id'], includes=['recordings'])
-                return r['artist-credit'][0]['artist']['name'], r['title'], [(c['recording']['title'], int(c['recording'].get('length', 0))) for c in rel['release']['medium-list'][0]['track-list']]
+                albums[i] = rel
+                if rel['release']['country'] in ('XW', 'US'):
+                    alb_i = i
+                    break
+        return (release_res['release-list'][alb_i]['artist-credit'][0]['artist']['name'],
+                release_res['release-list'][alb_i]['title'],
+                [(c['recording']['title'], int(c['recording'].get('length', 0))) for c in albums[alb_i]['release']['medium-list'][0]['track-list']])
     except IndexError:
+        # No hits.
+        pass
+    except KeyError:
         # No hits.
         pass
     return None, None, None
@@ -105,5 +115,12 @@ if __name__ == '__main__':
     for m in media:
         print(mangle_title(m))
         if args.actuallyrun:
-            print(get_track_list(m))
+            tracklist = get_track_list(m)
+            print(tracklist)
+            if tracklist[2] is not None:
+                for n,t in tracklist[2]:
+                    seconds=(t/1000)%60
+                    minutes=(t/(1000*60))%60
+                    hours=(t/(1000*60*60))%24
+                    print("%s %02d:%02d" % (n, minutes,seconds))
             time.sleep(15)

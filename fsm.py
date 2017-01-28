@@ -7,8 +7,8 @@ class fsm:
                STATE_NEITHER : 'neither'
               }
     def __init__(self):
-        self.thresh_loud = 2000
-        self.thresh_quiet = 250
+        self.thresh_loud = 5000
+        self.thresh_quiet = 150
         self.verbose = False
         self.reset()
 
@@ -38,8 +38,8 @@ class fsm:
             self.last_extreme = fsm.STATE_QUIET
             self.quiets += 1
             self.louds = 0
-            if self.quiets > 20:
-                self.samples_since_quiet = int(self.quiets/4)
+            if self.quiets > 12:
+                self.samples_since_quiet = int(self.quiets/2)
                 self.split_ready = True
             elif self.split_ready:
                 self.samples_since_quiet += 1

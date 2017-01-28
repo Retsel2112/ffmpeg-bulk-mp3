@@ -58,12 +58,12 @@ def analyze(packarg):
             l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
             chana.append(l)
             chanb.append(r)
-        avga = sum((abs(s) for s in chana))
-        avgb = sum((abs(s) for s in chanb))
+        avga = sum((abs(s) for s in chana)) / READBUF
+        avgb = sum((abs(s) for s in chanb)) / READBUF
         chana = []
         chanb = []
-        vol_state.add_sample(avga/READBUF)
-        print("%d\t%d\t%d\t%s\t%d (%d)" % (j, avga/READBUF, avgb/READBUF, vol_state.get_state(), vol_state.should_split(), vol_state.last_quiet()))
+        vol_state.add_sample(avga + avgb)
+        print("%d\t%d\t%d\t%s\t%d (%d)" % (j, avga, avgb, vol_state.get_state(), vol_state.should_split(), vol_state.last_quiet()))
         if vol_state.should_split():
             vol_state.reset()
         j += 0.1

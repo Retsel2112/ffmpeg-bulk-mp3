@@ -194,7 +194,7 @@ def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
             chanb.append(r)
         avga = sum((abs(s) for s in chana[-READBUF:])) / READBUF
         avgb = sum((abs(s) for s in chanb[-READBUF:])) / READBUF
-        vol_state.add_sample(avga)
+        vol_state.add_sample(avga + avgb)
         if vol_state.should_split():
             split_here = -(vol_state.last_quiet() * READBUF)
             try:

@@ -18,7 +18,7 @@ import fsm
 
 #READBUF = 44100 * 60
 READBUF = int(44100 / 10)
-SILENCE_LEVEL = 300
+SILENCE_LEVEL = 200
 LOUD_LEVEL = 2200
 SILENCE_DURATION = 10000
 BLIND_SILENCE_DURATION = 30000
@@ -75,100 +75,99 @@ def splittrack(packarg):
     print(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
     if tracklist is None:
         return
+    for t in tracklist:
+        print(t)
     #os.system(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
     proc = subprocess.Popen(['ffmpeg', '-loglevel', 'error', '-i', filename, '-y', '-codec:a', 'pcm_s16le', tmp_file_name], shell=False)
     (outwavdata, err) = proc.communicate()
     if tracklist[0][1] == 0:
         tracks = splittrack_nohints(artist, album, tracklist, tmp_file_name, args.destination)
     else:
-        f = wave.open(tmp_file_name, 'rb')
-        chans = f.getnchannels()
-        samps = f.getnframes()
-        sampwidth = f.getsampwidth()
-        samprate = f.getframerate()
-        SILENCE_WINDOW = int(samprate / 10)
-        assert sampwidth == 2
-        chana = []
-        chanb = []
-        tracks = []
-        zerorow = 0
-        j = 0
-        samples_processed = 0
-        split_now = False
-        split_here = 0
-        # the track length returned by musicbrainz is in mulliseconds.
-        # convert that to seconds then multiply by our sample rate to get an idea
-        # of when the next track should end, sample-wise
-        split_estimate = int((tracklist[j][1] / 1000) * samprate)
-        silence_interval_check = int(samprate / 1000)
-        while True:
-            twoch_samps = f.readframes(READBUF)
-            for twoch_samp in range(0,len(twoch_samps),sampwidth*chans):
-                samples_processed += 1
-                l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
-                chana.append(l)
-                chanb.append(r)
-                #if abs(l) < SILENCE_LEVEL:
-                if 0 == samples_processed % SILENCE_WINDOW:
-                    print('%d\t%d\t%d' % (int(samples_processed/samprate),
-                                              sum((abs(s) for s in chana[-silence_interval_check:]))/min(silence_interval_check, len(chana)),
-                                              zerorow))
-                    avgval = sum((abs(s) for s in chana[-silence_interval_check:]))/min(silence_interval_check, len(chana))
-                    if avgval < SILENCE_LEVEL:
-                        zerorow += SILENCE_WINDOW
-                if abs(l) > SILENCE_LEVEL:
-                    if zerorow > SILENCE_DURATION and reached(samples_processed, split_estimate, samprate):
-                        split_now = True
-                        split_here = max(-int(zerorow / 2), -10000)
-                    if abs(l) > LOUD_LEVEL and not split_now:
-                        zerorow = 0
-                if split_now:
-                    print("%d in a row (%d)" % (zerorow, zerorow/samprate))
-                    try:
-                        trackfilename = '%s - %s - %s.wav' % (artist, album, tracklist[j][0])
-                        trackname = tracklist[j][0]
-                    except IndexError:
-                        trackfilename = '%s_%s_%d.wav' % (artist, album, j)
-                        trackname = 'Track %d' % (j)
-                    tout = wave.open(trackfilename, 'wb')
-                    tout.setnchannels(2)
-                    tout.setsampwidth(sampwidth)
-                    tout.setframerate(samprate)
-                    tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[0:split_here], chanb[0:split_here]))))
-                    tout.close()
-                    tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
-                    j += 1
-                    if j != len(tracklist):
-                        split_estimate += int((tracklist[j][1] / 1000) * samprate)
-                    else:
-                        split_estimate = samps * 2
-                    chana = chana[split_here:]
-                    chanb = chanb[split_here:]
-                    zerorow = 0
-                    split_now = False
-            if len(twoch_samps) < (READBUF * sampwidth * chans):
-                break
-        if len(chana) > 10000:
-            try:
-                trackfilename = '%s - %s - %s.wav' % (artist, album, tracklist[j][0])
-                trackname = tracklist[j][0]
-            except IndexError:
-                trackfilename = '%s_%s_%d.wav' % (artist, album, j)
-                trackname = 'Track %d' % (j)
-            tout = wave.open(trackfilename, 'wb')
-            tout.setnchannels(2)
-            tout.setsampwidth(sampwidth)
-            tout.setframerate(samprate)
-            tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana, chanb))))
-            tout.close()
-            tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, args.destination))
-        f.close()
+        tracks = splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, args.destination)
     os.remove(tmp_file_name)
     print(tracks)
     list(map(convert, tracks))
     print("And that's it")
     shutil.move(filename, os.path.join(args.finished, os.path.basename(filename)))
     return
+
+def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destination):
+    f = wave.open(tmp_file_name, 'rb')
+    chans = f.getnchannels()
+    samps = f.getnframes()
+    sampwidth = f.getsampwidth()
+    samprate = f.getframerate()
+    assert sampwidth == 2
+    chana = []
+    chanb = []
+    tracks = []
+    j = 0
+    split_here = 0
+    # the track length returned by musicbrainz is in mulliseconds.
+    # convert that to seconds then multiply by our sample rate to get an idea
+    # of when the next track should end, sample-wise
+    silence_interval_check = int(samprate / 1000)
+    for trackname, split_estimate in tracklist:
+        next_track_length = int(split_estimate / 1000 * samprate)
+        twoch_samps = f.readframes(next_track_length)
+        print(len(twoch_samps)/samprate)
+        for twoch_samp in range(0,len(twoch_samps),sampwidth*chans):
+            l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
+            chana.append(l)
+            chanb.append(r)
+        try:
+            if len(tracklist) > 9:
+                trackfilename = '%s - %s - %02d - %s.wav' % (artist, album, j+1, trackname)
+            else:
+                trackfilename = '%s - %s - %d - %s.wav' % (artist, album, j+1, trackname)
+        except IndexError:
+            trackfilename = '%s_%s_%d.wav' % (artist, album, j)
+            trackname = 'Track %d' % (j)
+        #rewind until the last place we see something like silence
+        #In... like... the last two seconds?
+        last_silence = -1
+        for interval in range(0, -20, -1):
+            i_s = int((interval - 1) * samprate / 10)
+            i_e = int(interval * samprate / 10)
+            avga = sum((abs(s) for s in chana[i_s:(i_e if i_e else None)])) / abs(i_e - i_s)
+            avgb = sum((abs(s) for s in chanb[i_s:(i_e if i_e else None)])) / abs(i_e - i_s)
+            print("%d from %d to %d" % (avga + avgb, i_s, i_e))
+            if (avga + avgb) < SILENCE_LEVEL:
+                last_silence = int((i_s + i_e) / 2)
+                print("Backing up %d" % (last_silence))
+                break
+
+        tout = wave.open(trackfilename, 'wb')
+        tout.setnchannels(2)
+        tout.setsampwidth(sampwidth)
+        tout.setframerate(samprate)
+        tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana[:last_silence], chanb[:last_silence]))))
+        tout.close()
+        tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, destination))
+        j += 1
+        chana = chana[last_silence:]
+        chanb = chana[last_silence:]
+        if len(twoch_samps) < (READBUF * sampwidth * chans):
+            break
+    if len(chana) > 10000:
+        try:
+            if len(tracklist) > 9:
+                trackfilename = '%s - %s - %02d - %s.wav' % (artist, album, j+1, tracklist[j][0])
+            else:
+                trackfilename = '%s - %s - %d - %s.wav' % (artist, album, j+1, tracklist[j][0])
+            trackname = tracklist[j][0]
+        except IndexError:
+            trackfilename = '%s_%s_%d.wav' % (artist, album, j)
+            trackname = 'Track %d' % (j)
+        tout = wave.open(trackfilename, 'wb')
+        tout.setnchannels(2)
+        tout.setsampwidth(sampwidth)
+        tout.setframerate(samprate)
+        tout.writeframes(b''.join((struct.pack('<hh',smpl, smpr) for smpl, smpr in zip(chana, chanb))))
+        tout.close()
+        tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, destination))
+    f.close()
+    return tracks
 
 #tracks = splittrack_nohints(artist, album, tracklist, tmp_file_name)
 def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
@@ -183,8 +182,6 @@ def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
     tracks = []
     zerorow = 0
     j = 0
-    samples_processed = 0
-    split_now = False
     vol_state = fsm.fsm()
     while True:
         twoch_samps = f.readframes(READBUF)
@@ -214,7 +211,6 @@ def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
             chana = chana[split_here:]
             chanb = chanb[split_here:]
             zerorow = 0
-            split_now = False
             vol_state.reset()
         if len(twoch_samps) < (READBUF * sampwidth * chans):
             break

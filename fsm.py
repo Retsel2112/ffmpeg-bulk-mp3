@@ -7,8 +7,8 @@ class fsm:
                STATE_NEITHER : 'neither'
               }
     def __init__(self):
-        self.thresh_loud = 2200
-        self.thresh_quiet = 500
+        self.thresh_loud = 2000
+        self.thresh_quiet = 250
         self.verbose = False
         self.reset()
 
@@ -31,21 +31,23 @@ class fsm:
         self.thresh_quiet = qlev
 
     def add_sample(self, val):
-        if self.last_extreme != fsm.STATE_QUIET:
+        if self.split_ready and self.last_extreme != fsm.STATE_QUIET:
             self.samples_since_quiet += 1
         if val < self.thresh_quiet:
             self.current_state = fsm.STATE_QUIET
             self.last_extreme = fsm.STATE_QUIET
             self.quiets += 1
             self.louds = 0
-            self.samples_since_quiet = 0
-            if self.quiets > 5:
+            if self.quiets > 20:
+                self.samples_since_quiet = int(self.quiets/4)
                 self.split_ready = True
+            elif self.split_ready:
+                self.samples_since_quiet += 1
         elif val > self.thresh_loud:
             self.current_state = fsm.STATE_LOUD
             self.last_extreme = fsm.STATE_LOUD
             self.louds += 1
-            if self.louds > 5:
+            if self.louds > 20:
                 if self.split_ready:
                     self.split_now = True
                     if self.verbose:
@@ -53,7 +55,7 @@ class fsm:
         else:
             self.current_state = fsm.STATE_NEITHER
             self.louds = 0
-            if self.last_extreme != fsm.STATE_LOUD:
+            if self.split_ready and self.last_extreme != fsm.STATE_LOUD:
                 self.samples_since_quiet += 1
 
         #if val < self.thresh_quiet:

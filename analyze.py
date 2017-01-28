@@ -51,6 +51,7 @@ def analyze(packarg):
     samples_processed = 0
     split_now = False
     vol_state = fsm.fsm()
+    vol_state.set_verbose(True)
     while True:
         twoch_samps = f.readframes(READBUF)
         for twoch_samp in range(0,len(twoch_samps),sampwidth*chans):

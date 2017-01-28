@@ -74,6 +74,8 @@ def splittrack(packarg):
     artist, album, tracklist = idgetter.get_track_list(newname)
     print(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
     if tracklist is None:
+        if args.noconv is not None:
+            shutil.move(filename, os.path.join(args.noconv, os.path.basename(filename)))
         return
     for t in tracklist:
         print(t)
@@ -85,7 +87,6 @@ def splittrack(packarg):
     else:
         tracks = splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, args.destination)
     os.remove(tmp_file_name)
-    print(tracks)
     list(map(convert, tracks))
     print("And that's it")
     shutil.move(filename, os.path.join(args.finished, os.path.basename(filename)))
@@ -107,9 +108,11 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
     # convert that to seconds then multiply by our sample rate to get an idea
     # of when the next track should end, sample-wise
     silence_interval_check = int(samprate / 1000)
+    overshoot = samprate
     for trackname, split_estimate in tracklist:
         next_track_length = int(split_estimate / 1000 * samprate)
-        twoch_samps = f.readframes(next_track_length)
+        #When reading in, overshoot by a second:
+        twoch_samps = f.readframes(next_track_length + overshoot)
         print(len(twoch_samps)/samprate)
         for twoch_samp in range(0,len(twoch_samps),sampwidth*chans):
             l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
@@ -125,7 +128,7 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
             trackname = 'Track %d' % (j)
         #rewind until the last place we see something like silence
         #In... like... the last two seconds?
-        last_silence = -1
+        last_silence = -overshoot
         for interval in range(0, -20, -1):
             i_s = int((interval - 1) * samprate / 10)
             i_e = int(interval * samprate / 10)
@@ -195,8 +198,11 @@ def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
         if vol_state.should_split():
             split_here = -(vol_state.last_quiet() * READBUF)
             try:
-                trackfilename = '%s - %s - %s.wav' % (artist, album, tracklist[j][0])
                 trackname = tracklist[j][0]
+                if len(tracklist) > 9:
+                    trackfilename = '%s - %s - %02d - %s.wav' % (artist, album, j+1, trackname)
+                else:
+                    trackfilename = '%s - %s - %d - %s.wav' % (artist, album, j+1, trackname)
             except IndexError:
                 trackfilename = '%s_%s_%d.wav' % (artist, album, j)
                 trackname = 'Track %d' % (j)
@@ -216,8 +222,11 @@ def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
             break
     if len(chana) > 10000:
         try:
-            trackfilename = '%s - %s - %s.wav' % (artist, album, tracklist[j][0])
             trackname = tracklist[j][0]
+            if len(tracklist) > 9:
+                trackfilename = '%s - %s - %02d - %s.wav' % (artist, album, j+1, trackname)
+            else:
+                trackfilename = '%s - %s - %d - %s.wav' % (artist, album, j+1, trackname)
         except IndexError:
             trackfilename = '%s_%s_%d.wav' % (artist, album, j)
             trackname = 'Track %d' % (j)
@@ -242,6 +251,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--source', required=True, help='Source directory containing mp4 or webm files')
     parser.add_argument('-d', '--destination', required=True, help='Destination directory to place converted files')
     parser.add_argument('-f', '--finished', required=True, help='Directory to move source files after conversion')
+    parser.add_argument('-n', '--noconv', required=False, help='Directory to move source files after conversion')
     parser.add_argument('-m', '--multiproc', required=False, help='Maximum number of concurrent conversion processes (up to cpu_count) (default: 4)', type=int, default=4)
     args = parser.parse_args()
     args.finished = os.path.abspath(args.finished)
@@ -257,6 +267,12 @@ if __name__ == '__main__':
     except OSError as ex:
         if ex.errno != errno.EEXIST:
             raise
+    if args.noconv is not None:
+        try:
+            os.makedirs(args.noconv)
+        except OSError as ex:
+            if ex.errno != errno.EEXIST:
+                raise
     folder = os.path.abspath(args.source)
     media = get_media_paths(folder)
     print(media)

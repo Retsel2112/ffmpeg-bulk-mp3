@@ -2,6 +2,7 @@
 import argparse
 import os
 import os.path
+import re
 import struct
 import subprocess
 import string
@@ -88,15 +89,18 @@ def get_track_list(yttitle):
                 albums[i] = rel
                 if rel['release']['country'] in ('XW', 'US'):
                     alb_i = i
-                    break
+                    if r['release-group']['type'] == 'Album':
+                        break
         return (release_res['release-list'][alb_i]['artist-credit'][0]['artist']['name'],
                 release_res['release-list'][alb_i]['title'],
-                [(c['recording']['title'], int(c['recording'].get('length', 0))) for c in albums[alb_i]['release']['medium-list'][0]['track-list']])
+                [(re.sub(r'[\/:*?"><|]','',c['recording']['title']), int(c['recording'].get('length', 0))) for c in albums[alb_i]['release']['medium-list'][0]['track-list']])
     except IndexError:
         # No hits.
+        print("Err A")
         pass
     except KeyError:
         # No hits.
+        print("Err B")
         pass
     return None, None, None
 

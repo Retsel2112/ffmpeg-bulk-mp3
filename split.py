@@ -129,7 +129,7 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
         #rewind until the last place we see something like silence
         #In... like... the last two seconds?
         last_silence = -overshoot
-        for interval in range(0, -20, -1):
+        for interval in range(0, -100, -1):
             i_s = int((interval - 1) * samprate / 10)
             i_e = int(interval * samprate / 10)
             avga = sum((abs(s) for s in chana[i_s:(i_e if i_e else None)])) / abs(i_e - i_s)

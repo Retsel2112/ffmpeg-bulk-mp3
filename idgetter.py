@@ -66,9 +66,13 @@ def mangle_title(bulky):
 
 def get_track_list(yttitle):
     artist, album = mangle_title(yttitle)
-    search_string = mangle_title(yttitle)
     artist_res = mb.search_artists(artist=artist, type='group', strict=True)
-    release_res = mb.search_releases(release=album)
+    try:
+        release_res = mb.search_releases(release=album)
+    except ValueError:
+        # It is likely that the mangle_title wasn't able to find an artist/album split.
+        print('Unable to split: %s' % (yttitle))
+        return (None, None, None)
     artists = []
     arids = []
     albums = dict()

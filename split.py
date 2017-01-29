@@ -82,7 +82,7 @@ def splittrack(packarg):
     for t in tracklist:
         print(t)
     #os.system(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
-    proc = subprocess.Popen(['ffmpeg', '-loglevel', 'error', '-n', '-i', filename, '-y', '-codec:a', 'pcm_s16le', tmp_file_name], shell=False)
+    proc = subprocess.Popen(['ffmpeg', '-loglevel', 'error', '-i', filename, '-y', '-codec:a', 'pcm_s16le', tmp_file_name], shell=False)
     (outwavdata, err) = proc.communicate()
     if tracklist[0][1] == 0:
         tracks = splittrack_nohints(artist, album, tracklist, tmp_file_name, args.destination)

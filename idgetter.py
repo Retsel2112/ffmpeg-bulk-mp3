@@ -68,7 +68,9 @@ def get_track_list(yttitle):
     artist, album = mangle_title(yttitle)
     artist_res = mb.search_artists(artist=artist, type='group', strict=True)
     try:
-        release_res = mb.search_releases(release=album)
+        release_res = mb.search_releases(release=album, strict=True)
+        if release_res['release-count'] ==  0:
+            release_res = mb.search_releases(release=album, strict=False)
     except ValueError:
         # It is likely that the mangle_title wasn't able to find an artist/album split.
         print('Unable to split: %s' % (yttitle))

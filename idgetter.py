@@ -97,7 +97,7 @@ def get_track_list(yttitle):
                         break
         return (release_res['release-list'][alb_i]['artist-credit'][0]['artist']['name'],
                 release_res['release-list'][alb_i]['title'],
-                [(re.sub(r'[\/:*?"><|]','',c['recording']['title']), int(c['recording'].get('length', 0))) for c in albums[alb_i]['release']['medium-list'][0]['track-list']])
+                [(c['recording']['title'], int(c['recording'].get('length', 0))) for c in albums[alb_i]['release']['medium-list'][0]['track-list']])
     except IndexError:
         # No hits.
         print("Err A")

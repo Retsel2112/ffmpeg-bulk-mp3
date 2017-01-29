@@ -4,6 +4,7 @@ import errno
 import multiprocessing
 import os
 import os.path
+import re
 import shutil
 import struct
 import subprocess
@@ -38,6 +39,7 @@ def convert(fileinfo):
     artist, album, trackname, trackorder, trackfilename, trackdestination = fileinfo
     print(fileinfo)
     newname = '.'.join([os.path.splitext(os.path.split(trackfilename)[1])[0], "mp3"])
+    newname = re.sub(r'[\/:*?"><|]','', newname)
     newpath = os.sep.join((trackdestination, newname))
     #print('ffmpeg -loglevel error -i "{0}" -codec:a libmp3lame -qscale:a 2 -metadata album="{2}" -metadata artist="{3}" -metadata title="{4}" -metadata track="{5}" "{1}" '.format(trackfilename, newpath, album, artist, trackname, trackorder))
     #os.system('ffmpeg -loglevel error -i "{0}" -codec:a libmp3lame -qscale:a 2 -metadata album="{2}" -metadata artist="{3}" -metadata title="{4}" -metadata track="{5}" "{1}" '.format(trackfilename, newpath, album, artist, trackname, trackorder))
@@ -117,6 +119,7 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
     if abs(realtime - tracktime) > 15:
         # more than 15 seconds off? screw those track estimates, something is missing.
         f.close()
+        print('TIME MISMATCH - failover initiated')
         return splittrack_nohints(artist, album, tracklist, tmp_file_name, destination)
 
     # the track length returned by musicbrainz is in mulliseconds.
@@ -125,7 +128,7 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
     silence_interval_check = int(samprate / 1000)
     overshoot = samprate
     for trackname, split_estimate in tracklist:
-        next_track_length = int(split_estimate / 1000 * samprate)
+        next_track_length = int(split_estimate / 1000 * samprate) - len(chana)
         #When reading in, overshoot by a second:
         twoch_samps = f.readframes(next_track_length + overshoot)
         print(len(twoch_samps)/samprate)
@@ -155,6 +158,7 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
                 print("Backing up %d" % (last_silence))
                 break
 
+        trackfilename = re.sub(r'[\/:*?"><|]','', trackfilename)
         tout = wave.open(trackfilename, 'wb')
         tout.setnchannels(2)
         tout.setsampwidth(sampwidth)

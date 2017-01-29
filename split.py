@@ -106,6 +106,19 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
     tracks = []
     j = 0
     split_here = 0
+
+    # hold up - does the total album length from our tracklist seem accurate,
+    # given the values we just read as samps and samprate?
+    # Count the expected number of seconds:
+    tracktime = 0
+    for _, split_estimate in tracklist:
+        tracktime += split_estimate / 1000 # because split_estimate is in milliseconds
+    realtime = samps / samprate # because samples / (samples / second) gives seconds
+    if abs(realtime - tracktime) > 15:
+        # more than 15 seconds off? screw those track estimates, something is missing.
+        f.close()
+        return splittrack_nohints(artist, album, tracklist, tmp_file_name, destination)
+
     # the track length returned by musicbrainz is in mulliseconds.
     # convert that to seconds then multiply by our sample rate to get an idea
     # of when the next track should end, sample-wise
@@ -174,7 +187,6 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
     f.close()
     return tracks
 
-#tracks = splittrack_nohints(artist, album, tracklist, tmp_file_name)
 def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
     f = wave.open(tmp_file_name, 'rb')
     chans = f.getnchannels()
@@ -187,13 +199,18 @@ def splittrack_nohints(artist, album, tracklist, tmp_file_name, destination):
     tracks = []
     zerorow = 0
     j = 0
+    samples_read = 0
     vol_state = fsm.fsm()
     while True:
         twoch_samps = f.readframes(READBUF)
+        samples_read += READBUF
         for twoch_samp in range(0,len(twoch_samps),sampwidth*chans):
             l,r = struct.unpack('<2h', twoch_samps[twoch_samp:twoch_samp+(sampwidth*chans)])
             chana.append(l)
             chanb.append(r)
+        # I just signed an executive order that all tracks must be at least 25 seconds in length.
+        if (samples_read / samprate) < 25:
+            continue
         avga = sum((abs(s) for s in chana[-READBUF:])) / READBUF
         avgb = sum((abs(s) for s in chanb[-READBUF:])) / READBUF
         vol_state.add_sample(avga + avgb)

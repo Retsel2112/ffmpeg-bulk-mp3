@@ -18,11 +18,13 @@ class fsm:
     def reset(self):
         self.quiets = 0
         self.louds = 0
+        self.neithers = 0
         self.samples_since_quiet = 0
         self.current_state = fsm.STATE_NEITHER
         self.last_extreme = fsm.STATE_NEITHER
         self.split_ready = False
         self.split_now = False
+        self.was_loud = False
 
     def set_loud(self, llev):
         self.thresh_loud = llev
@@ -39,23 +41,32 @@ class fsm:
             self.quiets += 1
             self.louds = 0
             if self.quiets > 12:
-                self.samples_since_quiet = int(self.quiets/2)
-                self.split_ready = True
+                if self.was_loud:
+                    self.split_ready = True
+                if self.neithers < 20:
+                    self.samples_since_quiet = int(self.quiets/2)
+                else:
+                    self.samples_since_quiet += 1
             elif self.split_ready:
                 self.samples_since_quiet += 1
         elif val > self.thresh_loud:
             self.current_state = fsm.STATE_LOUD
             self.last_extreme = fsm.STATE_LOUD
             self.louds += 1
+            self.neithers = 0
             if self.louds > 20:
+                self.was_loud = True
                 if self.split_ready:
                     self.split_now = True
                     if self.verbose:
                         print("Should split.")
+                else:
+                    self.samples_since_quiet = 0
         else:
             self.current_state = fsm.STATE_NEITHER
             self.louds = 0
-            if self.split_ready and self.last_extreme != fsm.STATE_LOUD:
+            self.neithers += 1
+            if self.last_extreme != fsm.STATE_LOUD:
                 self.samples_since_quiet += 1
 
         #if val < self.thresh_quiet:

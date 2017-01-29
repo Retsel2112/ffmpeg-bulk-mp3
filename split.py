@@ -43,6 +43,7 @@ def convert(fileinfo):
     #os.system('ffmpeg -loglevel error -i "{0}" -codec:a libmp3lame -qscale:a 2 -metadata album="{2}" -metadata artist="{3}" -metadata title="{4}" -metadata track="{5}" "{1}" '.format(trackfilename, newpath, album, artist, trackname, trackorder))
     print(' '.join([
     'ffmpeg', 
+    '-n',
     '-loglevel', 'error', 
     '-i', trackfilename, 
     '-codec:a', 'libmp3lame', 
@@ -54,6 +55,7 @@ def convert(fileinfo):
     newpath]))
     proc = subprocess.Popen([
     'ffmpeg', 
+    '-n',
     '-loglevel', 'error', 
     '-i', trackfilename, 
     '-codec:a', 'libmp3lame', 
@@ -72,7 +74,7 @@ def splittrack(packarg):
     with tempfile.NamedTemporaryFile(dir='tmp', suffix='.wav', delete=False) as tmpfile:
         tmp_file_name = tmpfile.name
     artist, album, tracklist = idgetter.get_track_list(newname)
-    print(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
+    print(' '.join(['ffmpeg', '-n', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
     if tracklist is None:
         if args.noconv is not None:
             shutil.move(filename, os.path.join(args.noconv, os.path.basename(filename)))
@@ -80,7 +82,7 @@ def splittrack(packarg):
     for t in tracklist:
         print(t)
     #os.system(' '.join(['ffmpeg', '-i', filename, '-codec:a', 'pcm_s16le', tmp_file_name]))
-    proc = subprocess.Popen(['ffmpeg', '-loglevel', 'error', '-i', filename, '-y', '-codec:a', 'pcm_s16le', tmp_file_name], shell=False)
+    proc = subprocess.Popen(['ffmpeg', '-loglevel', 'error', '-n', '-i', filename, '-y', '-codec:a', 'pcm_s16le', tmp_file_name], shell=False)
     (outwavdata, err) = proc.communicate()
     if tracklist[0][1] == 0:
         tracks = splittrack_nohints(artist, album, tracklist, tmp_file_name, args.destination)

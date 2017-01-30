@@ -66,7 +66,13 @@ def mangle_title(bulky):
 
 def get_track_list(yttitle):
     artist, album = mangle_title(yttitle)
-    artist_res = mb.search_artists(artist=artist, strict=True)
+    try:
+        artist_res = mb.search_artists(artist=artist, strict=True)
+        if artist_res['artist-count'] == 0:
+            artist_res = mb.search_artists(alias=artist, strict=True)
+    except ValueError:
+        print('Unable to split: %s' % (yttitle))
+        return (None, None, None)
     try:
         release_res = mb.search_releases(release=album, strict=True)
         if release_res['release-count'] ==  0:

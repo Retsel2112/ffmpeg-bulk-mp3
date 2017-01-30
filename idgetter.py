@@ -93,9 +93,9 @@ def get_track_list(yttitle):
             if r['artist-credit'][0]['artist']['id'] in arids:
                 rel = mb.get_release_by_id(r['id'], includes=['recordings'])
                 albums[i] = rel
-                if rel['release']['country'] in ('XW', 'US'):
+                if rel['release'].get('country', '') in ('XW', 'US'):
                     alb_i = i
-                    if r['release-group']['type'] == 'Album':
+                    if r['release-group'].get('type', '') == 'Album':
                         break
         return (release_res['release-list'][alb_i]['artist-credit'][0]['artist']['name'],
                 release_res['release-list'][alb_i]['title'],

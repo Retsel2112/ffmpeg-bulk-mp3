@@ -168,7 +168,7 @@ def splittrack_trustbutverify(artist, album, tracklist, tmp_file_name, destinati
         tracks.append((artist, album, trackname, '%d/%d' % (j+1, len(tracklist)), trackfilename, destination))
         j += 1
         chana = chana[last_silence:]
-        chanb = chana[last_silence:]
+        chanb = chanb[last_silence:]
         if len(twoch_samps) < (READBUF * sampwidth * chans):
             break
     if len(chana) > 10000:
